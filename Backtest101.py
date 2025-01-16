@@ -124,6 +124,3 @@ st.dataframe(decision_df)
 st.subheader("Decision Classifications")
 for index, row in decision_df.iterrows():
     st.write(f"Decision {index+1}: {row['Action']} {row['OptionType']} at Strike {row['Strike']}, Classification: {row['Classification']}, Note: {row['Note']}")
-
-if __name__ == "__main__":
-    st.run()
