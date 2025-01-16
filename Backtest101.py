@@ -62,33 +62,40 @@ for _ in range(20):
 
 decision_df = pd.DataFrame(decisions)
 
-# Classify decisions (Good, Neutral, Bad) based on historical data
+# Classify decisions (Good, Neutral, Bad) based on mean reversion and 100-minute moving average
 def classify_decision(row):
     # Retrieve matching option data
     relevant_option = option_data[(option_data['Strike'] == row['Strike']) &
-                                   (option_data['OptionType'] == row['OptionType'])]
+                                  (option_data['OptionType'] == row['OptionType'])]
     if relevant_option.empty:
         return "Neutral", "No matching option data"
 
     current_price = relevant_option.iloc[row['Timestamp']]['Price']
     historical_prices = relevant_option.loc[:row['Timestamp'], 'Price']
     mean_price = historical_prices.mean()
+    
+    # Calculate 100-minute moving average
+    moving_avg_period = 100
+    if row['Timestamp'] < moving_avg_period:
+        moving_avg_price = historical_prices.mean()
+    else:
+        moving_avg_price = historical_prices.iloc[-moving_avg_period:].mean()
 
-    # Evaluate decision based on historical mean price
+    # Evaluate decision based on mean reversion and moving average
     if row['Action'] == "Buy":
-        if current_price < mean_price:  # Buying below historical average price
-            return "Good", "Price below historical average"
-        elif current_price == mean_price:
-            return "Neutral", "Price equals historical average"
+        if current_price < mean_price and current_price < moving_avg_price:
+            return "Good", "Price below mean and moving average"
+        elif current_price == mean_price or current_price == moving_avg_price:
+            return "Neutral", "Price equals mean or moving average"
         else:
-            return "Bad", "Price above historical average"
-    else:  # Sell
-        if current_price > mean_price:  # Selling above historical average price
-            return "Good", "Price above historical average"
-        elif current_price == mean_price:
-            return "Neutral", "Price equals historical average"
+            return "Bad", "Price above mean and moving average"
+    else:
+        if current_price > mean_price and current_price > moving_avg_price:
+            return "Good", "Price above mean and moving average"
+        elif current_price == mean_price or current_price == moving_avg_price:
+            return "Neutral", "Price equals mean or moving average"
         else:
-            return "Bad", "Price below historical average"
+            return "Bad", "Price below mean and moving average"
 
 # Apply classification
 decision_df[['Classification', 'Note']] = decision_df.apply(
