@@ -5,7 +5,7 @@ import random
 import matplotlib.pyplot as plt
 
 # Streamlit setup
-st.title("Nifty 50 Options Trading Simulation")
+st.title("JD's Options Trading Simulation")
 st.sidebar.header("Simulation Parameters")
 
 # Parameters for simulation
