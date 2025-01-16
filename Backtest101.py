@@ -168,7 +168,7 @@ st.pyplot(fig)
 # Plot IV vs. historical volatility
 st.subheader("Implied Volatility vs. Historical Volatility")
 historical_volatility = np.std(np.diff(np.log(underlying_prices))) * np.sqrt(252)  # Annualized historical volatility
-iv_data = option_data.groupby('Timestamp')['IV'].mean()
+iv_data = option_data.groupby(option_data.index // intervals_per_day)['IV'].mean()  # Averaging IV per day
 
 fig, ax = plt.subplots(figsize=(12, 6))
 ax.plot(timestamps[:len(iv_data)], iv_data.values, label="Implied Volatility", color="orange")
@@ -181,7 +181,7 @@ st.pyplot(fig)
 
 # Plot Delta trends over time
 st.subheader("Delta Trends")
-delta_data = option_data.groupby('Timestamp')['Delta'].mean()
+delta_data = option_data.groupby(option_data.index // intervals_per_day)['Delta'].mean()  # Averaging Delta per day
 
 fig, ax = plt.subplots(figsize=(12, 6))
 ax.plot(timestamps[:len(delta_data)], delta_data.values, label="Average Delta", color="purple")
@@ -190,3 +190,5 @@ ax.set_xlabel("Date and Time")
 ax.set_ylabel("Delta")
 ax.legend()
 st.pyplot(fig)
+
+st.write("Debugging complete.")
