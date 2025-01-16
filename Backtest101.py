@@ -36,33 +36,34 @@ for _ in range(20):
 
 decision_df = pd.DataFrame(decisions)
 
-# Classify decisions (Good, Neutral, Bad) based on historical data
+# Classify decisions (Good, Neutral, Bad) based on mean reversion logic
 def classify_decision(row):
     # Retrieve matching option data
     relevant_option = option_data[(option_data['Strike'] == row['Strike']) &
-                                   (option_data['OptionType'] == row['OptionType'])]
+                                  (option_data['OptionType'] == row['OptionType'])]
     if relevant_option.empty:
         return "Neutral", "No matching option data"
 
     current_price = relevant_option.iloc[row['Timestamp']]['Price']
-    historical_prices = relevant_option.loc[:row['Timestamp'], 'Price']
+    lookback_period = 20  # Number of previous intervals to consider for mean reversion
+    historical_prices = relevant_option.loc[max(0, row['Timestamp'] - lookback_period):row['Timestamp'], 'Price']
     mean_price = historical_prices.mean()
 
-    # Evaluate decision based on historical mean price
+    # Evaluate decision based on mean reversion
     if row['Action'] == "Buy":
-        if current_price < mean_price:  # Buying below historical average price
-            return "Good", "Price below historical average"
+        if current_price < mean_price:  # Buying below recent mean price
+            return "Good", "Price below recent mean"
         elif current_price == mean_price:
-            return "Neutral", "Price equals historical average"
+            return "Neutral", "Price equals recent mean"
         else:
-            return "Bad", "Price above historical average"
+            return "Bad", "Price above recent mean"
     else:  # Sell
-        if current_price > mean_price:  # Selling above historical average price
-            return "Good", "Price above historical average"
+        if current_price > mean_price:  # Selling above recent mean price
+            return "Good", "Price above recent mean"
         elif current_price == mean_price:
-            return "Neutral", "Price equals historical average"
+            return "Neutral", "Price equals recent mean"
         else:
-            return "Bad", "Price below historical average"
+            return "Bad", "Price below recent mean"
 
 # Apply classification
 decision_df[['Classification', 'Note']] = decision_df.apply(
