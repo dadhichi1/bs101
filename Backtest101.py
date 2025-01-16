@@ -9,7 +9,7 @@ st.title("Nifty 50 Options Trading Simulation")
 st.sidebar.header("Simulation Parameters")
 
 # Parameters for simulation
-days = st.sidebar.slider("Days", 1, 30, 5)
+days = st.sidebar.slider("Days", 1, 30, 15)
 intervals_per_day = 12 * 6  # 10-minute intervals in a day
 strike_price = st.sidebar.number_input("Strike Price", 5000, 20000, 18000)
 click_range = st.sidebar.number_input("Click Range", 1, 20, 10)
