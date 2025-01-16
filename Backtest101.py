@@ -4,31 +4,57 @@ import pandas as pd
 import random
 import matplotlib.pyplot as plt
 
-# Load pre-generated simulation data
-option_data = pd.read_json("simulation_data.json")
-
 # Streamlit setup
 st.title("Synthetic Options Data Simulation")
 st.sidebar.header("Simulation Parameters")
 
-# Parameters for simulation
-strike_price = st.sidebar.number_input("Strike Price", 50, 150, 100, key="strike_price")
-click_range = st.sidebar.number_input("Click Range", 1, 20, 10, key="click_range")
+# Parameters for synthetic data generation
+days = st.sidebar.slider("Days", 1, 30, 10)
+intervals_per_day = 12 * 24  # 5-minute intervals in a day
+strike_price = st.sidebar.number_input("Strike Price", 50, 150, 100)
+click_range = st.sidebar.number_input("Click Range", 1, 20, 10)
 
 # Generate synthetic underlying price movements (random walk)
 np.random.seed(42)
-days = 5  # Default to 5 days
-intervals_per_day = 12 * 24  # 5-minute intervals in a day
-underlying_prices = [strike_price] + list(np.cumsum(np.random.normal(0, 0.5, days * intervals_per_day - 1)) + strike_price)
+underlying_prices = [strike_price]
+for _ in range(days * intervals_per_day - 1):
+    movement = np.random.normal(0, 0.5)
+    underlying_prices.append(underlying_prices[-1] + movement)
 
-# Simulate 20 random buy/sell decisions over 5 days
+# Generate option prices (call and put) based on underlying price
+call_prices = []
+put_prices = []
+for price in underlying_prices:
+    for i in range(-click_range, click_range + 1):
+        strike = strike_price + i
+        intrinsic_value_call = max(0, price - strike)
+        intrinsic_value_put = max(0, strike - price)
+        
+        # Add extrinsic value (volatility skew and random noise)
+        extrinsic_value = max(0.5, np.random.normal(1.5, 0.3))
+        call_prices.append({
+            "Underlying": price,
+            "Strike": strike,
+            "OptionType": "Call",
+            "Price": intrinsic_value_call + extrinsic_value
+        })
+        put_prices.append({
+            "Underlying": price,
+            "Strike": strike,
+            "OptionType": "Put",
+            "Price": intrinsic_value_put + extrinsic_value
+        })
+
+# Combine into a DataFrame
+option_data = pd.DataFrame(call_prices + put_prices)
+
+# Simulate 20 random buy/sell decisions over 10 days
 decisions = []
-strikes = range(strike_price - click_range, strike_price + click_range + 1)
 for _ in range(20):
     decision = {
         "Timestamp": random.randint(0, len(underlying_prices) - 1),
         "OptionType": random.choice(["Call", "Put"]),
-        "Strike": random.choice(strikes),
+        "Strike": random.choice(range(strike_price - click_range, strike_price + click_range + 1)),
         "Action": random.choice(["Buy", "Sell"]),
         "Quantity": random.randint(1, 10)
     }
@@ -36,34 +62,33 @@ for _ in range(20):
 
 decision_df = pd.DataFrame(decisions)
 
-# Classify decisions (Good, Neutral, Bad) based on mean reversion logic
+# Classify decisions (Good, Neutral, Bad) based on historical data
 def classify_decision(row):
     # Retrieve matching option data
     relevant_option = option_data[(option_data['Strike'] == row['Strike']) &
-                                  (option_data['OptionType'] == row['OptionType'])]
+                                   (option_data['OptionType'] == row['OptionType'])]
     if relevant_option.empty:
         return "Neutral", "No matching option data"
 
     current_price = relevant_option.iloc[row['Timestamp']]['Price']
-    lookback_period = 20  # Number of previous intervals to consider for mean reversion
-    historical_prices = relevant_option.loc[max(0, row['Timestamp'] - lookback_period):row['Timestamp'], 'Price']
+    historical_prices = relevant_option.loc[:row['Timestamp'], 'Price']
     mean_price = historical_prices.mean()
 
-    # Evaluate decision based on mean reversion
+    # Evaluate decision based on historical mean price
     if row['Action'] == "Buy":
-        if current_price < mean_price:  # Buying below recent mean price
-            return "Good", "Price below recent mean"
+        if current_price < mean_price:  # Buying below historical average price
+            return "Good", "Price below historical average"
         elif current_price == mean_price:
-            return "Neutral", "Price equals recent mean"
+            return "Neutral", "Price equals historical average"
         else:
-            return "Bad", "Price above recent mean"
+            return "Bad", "Price above historical average"
     else:  # Sell
-        if current_price > mean_price:  # Selling above recent mean price
-            return "Good", "Price above recent mean"
+        if current_price > mean_price:  # Selling above historical average price
+            return "Good", "Price above historical average"
         elif current_price == mean_price:
-            return "Neutral", "Price equals recent mean"
+            return "Neutral", "Price equals historical average"
         else:
-            return "Bad", "Price below recent mean"
+            return "Bad", "Price below historical average"
 
 # Apply classification
 decision_df[['Classification', 'Note']] = decision_df.apply(
