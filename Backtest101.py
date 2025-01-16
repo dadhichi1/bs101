@@ -4,9 +4,28 @@ import random
 import streamlit as st
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+from scipy.stats import norm
+
+# Function to calculate The Greeks
+def calculate_greeks(S, K, T, r, sigma, option_type="call"):
+    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    if option_type == "call":
+        delta = norm.cdf(d1)
+        gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T))
+        theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T)) - r * K * np.exp(-r * T) * norm.cdf(d2)) / 365
+        vega = S * norm.pdf(d1) * np.sqrt(T) / 100
+        rho = K * T * np.exp(-r * T) * norm.cdf(d2) / 100
+    else:  # put
+        delta = -norm.cdf(-d1)
+        gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T))
+        theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T)) + r * K * np.exp(-r * T) * norm.cdf(-d2)) / 365
+        vega = S * norm.pdf(d1) * np.sqrt(T) / 100
+        rho = -K * T * np.exp(-r * T) * norm.cdf(-d2) / 100
+    return delta, gamma, theta, vega, rho
 
 # Streamlit app setup
-st.title("Options Decision Tool")
+st.title("Advanced Options Decision Tool")
 st.sidebar.header("Parameters")
 
 # Parameters for synthetic data generation
@@ -23,9 +42,14 @@ underlying_prices = np.cumsum(np.random.normal(0, 0.5, days * intervals_per_day)
 start_time = datetime(2025, 1, 1, 9, 15)  # NIFTY50 trading start time
 timestamps = [start_time + timedelta(minutes=5 * i) for i in range(days * intervals_per_day)]
 
+# Risk-free rate (assumed)
+r = 0.05
+
 # Generate option prices (call and put) based on underlying price
 call_prices, put_prices = [], []
-for price in underlying_prices:
+for idx, price in enumerate(underlying_prices):
+    T = (days * intervals_per_day - idx) / (days * intervals_per_day * 365)  # Time to maturity in years
+    sigma = np.random.normal(0.2, 0.05)  # Random volatility
     for i in range(-click_range, click_range + 1):
         strike = strike_price + i
         intrinsic_value_call = max(0, price - strike)
@@ -33,17 +57,35 @@ for price in underlying_prices:
         
         # Add extrinsic value (volatility skew and random noise)
         extrinsic_value = max(0.5, np.random.normal(1.5, 0.3))
+        call_price = intrinsic_value_call + extrinsic_value
+        put_price = intrinsic_value_put + extrinsic_value
+        
+        delta_c, gamma_c, theta_c, vega_c, rho_c = calculate_greeks(price, strike, T, r, sigma, option_type="call")
+        delta_p, gamma_p, theta_p, vega_p, rho_p = calculate_greeks(price, strike, T, r, sigma, option_type="put")
+        
         call_prices.append({
             "Underlying": price,
             "Strike": strike,
             "OptionType": "Call",
-            "Price": intrinsic_value_call + extrinsic_value
+            "Price": call_price,
+            "Delta": delta_c,
+            "Gamma": gamma_c,
+            "Theta": theta_c,
+            "Vega": vega_c,
+            "Rho": rho_c,
+            "IV": sigma
         })
         put_prices.append({
             "Underlying": price,
             "Strike": strike,
             "OptionType": "Put",
-            "Price": intrinsic_value_put + extrinsic_value
+            "Price": put_price,
+            "Delta": delta_p,
+            "Gamma": gamma_p,
+            "Theta": theta_p,
+            "Vega": vega_p,
+            "Rho": rho_p,
+            "IV": sigma
         })
 
 # Combine into a DataFrame
@@ -120,5 +162,31 @@ if not put_prices_sample.empty:
 ax.set_title(f"Option Price Movement for Strike {sample_strike}")
 ax.set_xlabel("Date and Time")
 ax.set_ylabel("Option Price")
+ax.legend()
+st.pyplot(fig)
+
+# Plot IV vs. historical volatility
+st.subheader("Implied Volatility vs. Historical Volatility")
+historical_volatility = np.std(np.diff(np.log(underlying_prices))) * np.sqrt(252)  # Annualized historical volatility
+iv_data = option_data.groupby('Timestamp')['IV'].mean()
+
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(timestamps[:len(iv_data)], iv_data.values, label="Implied Volatility", color="orange")
+ax.axhline(y=historical_volatility, color='blue', linestyle='--', label="Historical Volatility")
+ax.set_title("Implied Volatility vs. Historical Volatility")
+ax.set_xlabel("Date and Time")
+ax.set_ylabel("Volatility")
+ax.legend()
+st.pyplot(fig)
+
+# Plot Delta trends over time
+st.subheader("Delta Trends")
+delta_data = option_data.groupby('Timestamp')['Delta'].mean()
+
+fig, ax = plt.subplots(figsize=(12, 6))
+ax.plot(timestamps[:len(delta_data)], delta_data.values, label="Average Delta", color="purple")
+ax.set_title("Delta Trends")
+ax.set_xlabel("Date and Time")
+ax.set_ylabel("Delta")
 ax.legend()
 st.pyplot(fig)
