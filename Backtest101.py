@@ -9,29 +9,24 @@ st.title("Synthetic Options Data Simulation")
 st.sidebar.header("Simulation Parameters")
 
 # Parameters for synthetic data generation
-days = st.sidebar.slider("Days", 1, 30, 10)
+days = st.sidebar.slider("Days", 1, 30, 5)  # Default to 5 days
 intervals_per_day = 12 * 24  # 5-minute intervals in a day
 strike_price = st.sidebar.number_input("Strike Price", 50, 150, 100)
 click_range = st.sidebar.number_input("Click Range", 1, 20, 10)
 
 # Generate synthetic underlying price movements (random walk)
 np.random.seed(42)
-underlying_prices = [strike_price]
-for _ in range(days * intervals_per_day - 1):
-    movement = np.random.normal(0, 0.5)
-    underlying_prices.append(underlying_prices[-1] + movement)
+underlying_prices = [strike_price] + list(np.cumsum(np.random.normal(0, 0.5, days * intervals_per_day - 1)) + strike_price)
 
 # Generate option prices (call and put) based on underlying price
 call_prices = []
 put_prices = []
+strikes = range(strike_price - click_range, strike_price + click_range + 1)
 for price in underlying_prices:
-    for i in range(-click_range, click_range + 1):
-        strike = strike_price + i
+    extrinsic_value = max(0.5, np.random.normal(1.5, 0.3))
+    for strike in strikes:
         intrinsic_value_call = max(0, price - strike)
         intrinsic_value_put = max(0, strike - price)
-        
-        # Add extrinsic value (volatility skew and random noise)
-        extrinsic_value = max(0.5, np.random.normal(1.5, 0.3))
         call_prices.append({
             "Underlying": price,
             "Strike": strike,
@@ -48,13 +43,13 @@ for price in underlying_prices:
 # Combine into a DataFrame
 option_data = pd.DataFrame(call_prices + put_prices)
 
-# Simulate 20 random buy/sell decisions over 10 days
+# Simulate 20 random buy/sell decisions over 5 days
 decisions = []
 for _ in range(20):
     decision = {
         "Timestamp": random.randint(0, len(underlying_prices) - 1),
         "OptionType": random.choice(["Call", "Put"]),
-        "Strike": random.choice(range(strike_price - click_range, strike_price + click_range + 1)),
+        "Strike": random.choice(strikes),
         "Action": random.choice(["Buy", "Sell"]),
         "Quantity": random.randint(1, 10)
     }
