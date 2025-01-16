@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import random
 import matplotlib.pyplot as plt
-import yfinance as yf
 
 # Streamlit setup
 st.title("Nifty 50 Options Trading Simulation")
@@ -15,14 +14,18 @@ intervals_per_day = 12 * 6  # 10-minute intervals in a day
 strike_price = st.sidebar.number_input("Strike Price", 5000, 20000, 18000)
 click_range = st.sidebar.number_input("Click Range", 1, 20, 10)
 
-# Fetch historical Nifty 50 data
-nifty50 = yf.download("^NSEI", period=f"{days}d", interval="10m")
-underlying_prices = nifty50['Close'].tolist()
+# Generate synthetic underlying price movements (random walk)
+np.random.seed(42)
+underlying_prices = [strike_price]
+for _ in range(days * intervals_per_day - 1):
+    movement = np.random.normal(0, 0.5)
+    underlying_prices.append(underlying_prices[-1] + movement)
+timestamps = pd.date_range(start='2023-01-01', periods=len(underlying_prices), freq='10T')
 
 # Generate option prices (call and put) based on underlying price
 call_prices = []
 put_prices = []
-for price in underlying_prices:
+for price, timestamp in zip(underlying_prices, timestamps):
     for i in range(-click_range, click_range + 1):
         strike = strike_price + i * 50  # Strike prices in multiples of 50
         intrinsic_value_call = max(0, price - strike)
@@ -31,14 +34,14 @@ for price in underlying_prices:
         # Add extrinsic value (volatility skew and random noise)
         extrinsic_value = max(0.5, np.random.normal(1.5, 0.3))
         call_prices.append({
-            "Timestamp": nifty50.index[underlying_prices.index(price)],
+            "Timestamp": timestamp,
             "Underlying": price,
             "Strike": strike,
             "OptionType": "Call",
             "Price": intrinsic_value_call + extrinsic_value
         })
         put_prices.append({
-            "Timestamp": nifty50.index[underlying_prices.index(price)],
+            "Timestamp": timestamp,
             "Underlying": price,
             "Strike": strike,
             "OptionType": "Put",
@@ -105,7 +108,7 @@ decision_df[['Classification', 'Note']] = decision_df.apply(
 # Plot graphs for better understanding
 st.subheader("Underlying Price Movement")
 fig, ax = plt.subplots()
-ax.plot(nifty50.index, underlying_prices, label="Underlying Price", color="blue")
+ax.plot(timestamps, underlying_prices, label="Underlying Price", color="blue")
 ax.set_title("Underlying Price Movement")
 ax.set_xlabel("Date and Time")
 ax.set_ylabel("Price")
