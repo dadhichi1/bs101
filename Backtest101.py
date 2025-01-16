@@ -9,8 +9,8 @@ st.title("Synthetic Options Data Simulation")
 st.sidebar.header("Simulation Parameters")
 
 # Parameters for synthetic data generation
-days = st.sidebar.slider("Days", 1, 30, 10)
-intervals_per_day = 12 * 24  # 5-minute intervals in a day
+days = st.sidebar.slider("Days", 1, 30, 5)
+intervals_per_day = 12 * 12  # 10-minute intervals in a day
 strike_price = st.sidebar.number_input("Strike Price", 50, 150, 100)
 click_range = st.sidebar.number_input("Click Range", 1, 20, 10)
 
